@@ -1,0 +1,95 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Liveness Check</title>
+  <style>
+    body { margin: 0; overflow: hidden; text-align: center; background: #000; color: white; }
+    canvas, video { position: absolute; top: 0; left: 0; }
+    #message {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      font-size: 2em;
+      color: red;
+      text-align: center;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+<div id="message">جارٍ تحميل النماذج...</div>
+<video id="video" width="720" height="560" autoplay muted></video>
+<canvas id="overlay"></canvas>
+
+<!-- face-api.js CDN -->
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+
+<script>
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const ctx = overlay.getContext('2d');
+  const message = document.getElementById('message');
+
+  async function setup() {
+    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+    message.textContent = "يرجى وضع وجهك داخل الإطار";
+
+    navigator.mediaDevices.getUserMedia({ video: {} })
+      .then(stream => {
+        video.srcObject = stream;
+      });
+  }
+
+  video.addEventListener('play', () => {
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+
+    const checkFace = async () => {
+      const result = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+      // إطار الدائرة
+      const centerX = overlay.width / 2;
+      const centerY = overlay.height / 2;
+      const radius = 150;
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      if (result) {
+        const box = result.box;
+        const faceCenterX = box.x + box.width / 2;
+        const faceCenterY = box.y + box.height / 2;
+        const faceRadius = Math.max(box.width, box.height) / 2;
+
+        // رسم مستطيل الوجه
+        ctx.strokeStyle = 'yellow';
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+        const distance = Math.hypot(faceCenterX - centerX, faceCenterY - centerY);
+
+        if (distance > 50 || faceRadius < 70) {
+          message.textContent = "اقترب أكثر...";
+        } else {
+          message.textContent = "جيد! حافظ على هذا الوضع";
+        }
+      } else {
+        message.textContent = "لا يوجد وجه...";
+      }
+
+      requestAnimationFrame(checkFace);
+    };
+
+    checkFace();
+  });
+
+  setup();
+</script>
+
+</body>
+</html>
